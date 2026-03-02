@@ -1,0 +1,66 @@
+{
+  "name": "aibomgen-cli-action",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub Action for generating AI Bills of Materials (AIBOMs) with AIBoMGen-cli",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "format": "prettier --write **/*.ts",
+    "format-check": "prettier --check **/*.ts",
+    "lint": "eslint src/**/*.ts",
+    "package": "npm run package:build",
+    "package:build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.cjs",
+    "test": "node --import tsx --test --experimental-test-module-mocks tests/*.test.ts",
+    "all": "npm run build && npm run format && npm run lint && npm run package && npm test",
+    "prepare": "husky",
+    "precommit": "pretty-quick --staged && npm run package && git add dist/",
+    "update-deps": "npx npm-check-updates -u && npm i && npm audit fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/idlab-discover/AIBoMGen-cli-action.git"
+  },
+  "keywords": [
+    "actions",
+    "node",
+    "aibom",
+    "sbom",
+    "ai",
+    "machine-learning"
+  ],
+  "author": "IDLab Discover",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/idlab-discover/AIBoMGen-cli-action/issues"
+  },
+  "homepage": "https://github.com/idlab-discover/AIBoMGen-cli-action#readme",
+  "dependencies": {
+    "@actions/artifact": "^6.1.0",
+    "@actions/core": "^3.0.0",
+    "@actions/exec": "^3.0.0",
+    "@actions/github": "^9.0.0",
+    "@actions/tool-cache": "^4.0.0",
+    "fast-safe-stringify": "^2.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@octokit/webhooks-types": "^7.6.1",
+    "@types/node": "^25.0.0",
+    "esbuild": "^0.27.0",
+    "eslint": "^10.0.1",
+    "eslint-config-prettier": "^10.0.0",
+    "husky": "^9.0.0",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.0.0",
+    "prettier-plugin-organize-imports": "^4.0.0",
+    "pretty-quick": "^4.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=v20.11.0"
+  }
+}

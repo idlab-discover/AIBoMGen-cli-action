@@ -1,0 +1,21 @@
+name: "AIBoMGen-cli Action"
+description: "Downloads AIBoMGen-cli (a Go CLI tool) to the Action tool cache and provides a command reference"
+author: "IDLab Discover"
+
+inputs:
+  run:
+    required: true
+    description: "The action to run"
+    default: "download-aibomgen"
+
+  aibomgen-version:
+    required: false
+    description: "The version of AIBoMGen-cli to download (e.g. v0.1.0). Defaults to the bundled version."
+
+outputs:
+  cmd:
+    description: "A reference to the AIBoMGen-cli command"
+
+runs:
+  using: "node20"
+  main: "../dist/index.cjs"
