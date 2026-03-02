@@ -94802,7 +94802,8 @@ var GithubClient = class {
   }
   // ─── Artifacts ────────────────────────────────────────────────────────────
   async uploadWorkflowArtifact({
-    file,
+    files,
+    rootDir,
     name,
     retention
   }) {
@@ -94810,7 +94811,7 @@ var GithubClient = class {
     if (retention > 0) {
       options.retentionDays = retention;
     }
-    await artifact_default.uploadArtifact(name, [file], import_path3.default.dirname(file), options);
+    await artifact_default.uploadArtifact(name, files, rootDir, options);
   }
   async listCurrentWorkflowArtifacts() {
     const { runId } = context2;
@@ -94991,12 +94992,12 @@ async function executeAIBoMGenScan(opts) {
   }
   const scanArgs = ["scan"];
   scanArgs.push("--input", opts.input.path);
-  let effectiveOutputFile;
+  let outputDir;
   if (opts.outputFile) {
-    effectiveOutputFile = opts.outputFile;
     scanArgs.push("--output", opts.outputFile);
+    outputDir = import_path4.default.dirname(opts.outputFile);
   } else {
-    effectiveOutputFile = opts.format === "xml" ? "dist/aibom.xml" : "dist/aibom.json";
+    outputDir = "dist";
   }
   if (opts.format && opts.format !== "auto") {
     scanArgs.push("--format", opts.format);
@@ -95035,17 +95036,22 @@ async function executeAIBoMGenScan(opts) {
   if (exitCode > 0) {
     throw new Error("AIBoMGen-cli scan failed");
   }
-  return effectiveOutputFile;
+  const aibomSuffix = opts.format === "xml" ? "aibom.xml" : "aibom.json";
+  if (!fs11.existsSync(outputDir)) {
+    return [];
+  }
+  return fs11.readdirSync(outputDir).filter((f) => f.endsWith(aibomSuffix)).map((f) => import_path4.default.join(outputDir, f));
 }
-async function uploadAIBomArtifact(filePath) {
+async function uploadAIBomArtifact(filePaths) {
   const { repo } = context2;
   const client2 = getClient2(repo, getInput("github-token"));
-  const artifactName = getInput("artifact-name") || import_path4.default.basename(filePath);
+  const artifactName = getInput("artifact-name") || import_path4.default.basename(import_path4.default.dirname(filePaths[0])) + "-aibom";
   const retentionDays = parseInt(getInput("upload-artifact-retention") || "0");
   info(dashWrap("Uploading workflow artifact"));
-  info(filePath);
+  for (const f of filePaths) info(f);
   await client2.uploadWorkflowArtifact({
-    file: filePath,
+    files: filePaths,
+    rootDir: import_path4.default.dirname(filePaths[0]),
     name: artifactName,
     retention: retentionDays
   });
@@ -95109,7 +95115,7 @@ async function runAIBoMGenAction() {
   const start = Date.now();
   const doUpload = (getInput("upload-artifact") || "true").toLowerCase() === "true";
   const hfTimeout = parseInt(getInput("hf-timeout") || "0");
-  const writtenFile = await executeAIBoMGenScan({
+  const writtenFiles = await executeAIBoMGenScan({
     input: { path: getInput("path") || "." },
     format: getAIBomFormat(),
     specVersion: getInput("spec-version"),
@@ -95121,14 +95127,15 @@ async function runAIBoMGenAction() {
     configFile: getInput("config")
   });
   info(`AIBOM scan completed in: ${(Date.now() - start) / 1e3}s`);
-  if (!fs11.existsSync(writtenFile)) {
+  if (writtenFiles.length === 0) {
     warning(
-      `No AIBOM output file found at '${writtenFile}' \u2014 no models may have been discovered.`
+      `No AIBOM output files found in output directory \u2014 no models may have been discovered.`
     );
     return;
   }
+  info(`Found ${writtenFiles.length} AIBOM file(s).`);
   if (doUpload) {
-    await uploadAIBomArtifact(writtenFile);
+    await uploadAIBomArtifact(writtenFiles);
   }
 }
 async function runAndFailBuildOnException(fn) {

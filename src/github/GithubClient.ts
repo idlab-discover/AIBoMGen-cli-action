@@ -87,11 +87,13 @@ export class GithubClient {
   // ─── Artifacts ────────────────────────────────────────────────────────────
 
   async uploadWorkflowArtifact({
-    file,
+    files,
+    rootDir,
     name,
     retention,
   }: {
-    file: string;
+    files: string[];
+    rootDir: string;
     name: string;
     retention: number;
   }): Promise<void> {
@@ -99,7 +101,7 @@ export class GithubClient {
     if (retention > 0) {
       options.retentionDays = retention;
     }
-    await artifactClient.uploadArtifact(name, [file], path.dirname(file), options);
+    await artifactClient.uploadArtifact(name, files, rootDir, options);
   }
 
   async listCurrentWorkflowArtifacts(): Promise<Artifact[]> {

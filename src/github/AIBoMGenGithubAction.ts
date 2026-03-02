@@ -154,7 +154,7 @@ export function getArtifactName(): string {
  *     [--hf-timeout <sec>] \
  *     --log-level quiet|standard|debug
  */
-async function executeAIBoMGenScan(opts: AIBoMGenOptions): Promise<string> {
+async function executeAIBoMGenScan(opts: AIBoMGenOptions): Promise<string[]> {
   const cmd = await getAIBoMGenCommand();
 
   // --config is a persistent root-level flag; it must appear before the subcommand
@@ -167,14 +167,15 @@ async function executeAIBoMGenScan(opts: AIBoMGenOptions): Promise<string> {
 
   scanArgs.push("--input", opts.input.path);
 
-  // Determine the effective output path so we know where to read the file back
-  let effectiveOutputFile: string;
+  // Determine the output directory so we can glob for files after the scan.
+  // The CLI names files like <modelid>_aibom.json — one per discovered model.
+  let outputDir: string;
   if (opts.outputFile) {
-    effectiveOutputFile = opts.outputFile;
     scanArgs.push("--output", opts.outputFile);
+    outputDir = path.dirname(opts.outputFile);
   } else {
-    // CLI default: dist/aibom.json or dist/aibom.xml
-    effectiveOutputFile = opts.format === "xml" ? "dist/aibom.xml" : "dist/aibom.json";
+    // CLI default output directory
+    outputDir = "dist";
   }
 
   if (opts.format && opts.format !== "auto") {
@@ -222,24 +223,36 @@ async function executeAIBoMGenScan(opts: AIBoMGenOptions): Promise<string> {
     throw new Error("AIBoMGen-cli scan failed");
   }
 
-  return effectiveOutputFile;
+  // Glob the output directory for all AIBOM files written by the CLI.
+  // Files are named <modelid>_aibom.json (or .xml) — one per discovered model.
+  const aibomSuffix = opts.format === "xml" ? "aibom.xml" : "aibom.json";
+  if (!fs.existsSync(outputDir)) {
+    return [];
+  }
+  return fs
+    .readdirSync(outputDir)
+    .filter((f) => f.endsWith(aibomSuffix))
+    .map((f) => path.join(outputDir, f));
 }
 
 /**
- * Uploads the generated AIBOM file as a workflow artifact.
+ * Uploads all generated AIBOM files as a single workflow artifact.
  */
-async function uploadAIBomArtifact(filePath: string): Promise<void> {
+async function uploadAIBomArtifact(filePaths: string[]): Promise<void> {
   const { repo } = github.context;
   const client = getClient(repo, core.getInput("github-token"));
 
-  const artifactName = core.getInput("artifact-name") || path.basename(filePath);
+  // Use a shared artifact name; individual file names are preserved inside.
+  const artifactName =
+    core.getInput("artifact-name") || path.basename(path.dirname(filePaths[0])) + "-aibom";
   const retentionDays = parseInt(core.getInput("upload-artifact-retention") || "0");
 
   core.info(dashWrap("Uploading workflow artifact"));
-  core.info(filePath);
+  for (const f of filePaths) core.info(f);
 
   await client.uploadWorkflowArtifact({
-    file: filePath,
+    files: filePaths,
+    rootDir: path.dirname(filePaths[0]),
     name: artifactName,
     retention: retentionDays,
   });
@@ -327,7 +340,7 @@ export async function runAIBoMGenAction(): Promise<void> {
 
   const hfTimeout = parseInt(core.getInput("hf-timeout") || "0");
 
-  const writtenFile = await executeAIBoMGenScan({
+  const writtenFiles = await executeAIBoMGenScan({
     input: { path: core.getInput("path") || "." },
     format: getAIBomFormat(),
     specVersion: core.getInput("spec-version"),
@@ -341,15 +354,17 @@ export async function runAIBoMGenAction(): Promise<void> {
 
   core.info(`AIBOM scan completed in: ${(Date.now() - start) / 1000}s`);
 
-  if (!fs.existsSync(writtenFile)) {
+  if (writtenFiles.length === 0) {
     core.warning(
-      `No AIBOM output file found at '${writtenFile}' — no models may have been discovered.`,
+      `No AIBOM output files found in output directory — no models may have been discovered.`,
     );
     return;
   }
 
+  core.info(`Found ${writtenFiles.length} AIBOM file(s).`);
+
   if (doUpload) {
-    await uploadAIBomArtifact(writtenFile);
+    await uploadAIBomArtifact(writtenFiles);
   }
 }
 
