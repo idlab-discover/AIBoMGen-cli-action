@@ -65,6 +65,11 @@ A GitHub Action that generates an **AI Bill of Materials (AIBOM)** for Hugging F
 
     # Attach the AIBOM to a GitHub release when the event is a release or tag push.
     # Default: "true"
+    # If you want to upload on release:
+    # In the workflow file set:
+    # permissions:
+    #   contents: write  # needed to attach to releases
+    #   actions: read    # needed to list artifacts for release upload
     upload-release-assets: "true"
 
     # Regex to filter which artifacts are attached to the release.
